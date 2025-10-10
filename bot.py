@@ -168,10 +168,19 @@ if __name__ == "__main__":
     application.add_handler(CallbackQueryHandler(button_callback))
 
     # Start the bot with polling
+    import asyncio
+
+async def main_async():
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    await application.bot.delete_webhook()
+
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    # Add other handlers...
+
     await application.run_polling()
 
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main_async())
-
-
