@@ -7,16 +7,11 @@ from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler,
     filters, ContextTypes
 )
-import nest_asyncio
 
-# Configuration
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7642147352:AAFhI8O8vpvSOovonO_A5UhTlTB4gpwFij4")
 ADMIN_IDS = {6065778458}
 DB_PATH = "filebot.db"
 AUTO_DELETE_MINUTES = 30
-
-# Ensure only one event loop
-nest_asyncio.apply()
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -181,7 +176,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else "photo" if update.message.photo
             else "video"
         )
-        # Fix for photo file_name missing
         file_name = getattr(file_obj, "file_name", None) or "unknown"
         now = datetime.utcnow()
         delete_at = now + timedelta(minutes=AUTO_DELETE_MINUTES)
@@ -193,18 +187,21 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log_action(owner_id, "upload", f"Uploaded {file_type}: {file_name}")
         conn.commit()
         await update.message.reply_text(f"File {file_name} uploaded and scheduled for auto-deletion.")
-        # Use create_task for background delete, avoid blocking
         asyncio.create_task(auto_delete_file(file_db_id, AUTO_DELETE_MINUTES * 60))
     except Exception as e:
         print("File upload error:", e)
     finally:
         conn.close()
 
+async def error_handler(update, context: ContextTypes.DEFAULT_TYPE):
+    print(f'Update "{update}" caused error "{context.error}"')
+    if update and hasattr(update, 'message') and update.message:
+        await update.message.reply_text("An error occurred. Please try again later.")
+
 async def main_async():
     init_db()
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     await app.bot.delete_webhook(drop_pending_updates=True)
-    # Add handlers only once
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("logout", logout))
     app.add_handler(CommandHandler("admin", admin_panel))
@@ -212,7 +209,11 @@ async def main_async():
     app.add_handler(CallbackQueryHandler(button_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VIDEO, handle_file))
+    app.add_error_handler(error_handler)
     await app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main_async())
+    import asyncio
+    # Use event loop compatible with environments like Render
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main_async())
