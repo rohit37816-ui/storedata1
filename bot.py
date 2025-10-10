@@ -264,4 +264,41 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("adm_view_"):
         fid = data.split("_")[2]
-        cur.execute("
+       async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    user_id = query.from_user.id
+
+    # Only admin can use
+    if user_id not in ADMIN_IDS:
+        await query.edit_message_text("❌ You are not an admin!")
+        return
+
+    # View a user's file
+    if data.startswith("adm_view_"):
+        fid = data.split("_")[2]
+        cur.execute("SELECT file_id, file_name, file_type FROM files WHERE file_id=? AND is_deleted=0", (fid,))
+        row = cur.fetchone()
+        if row:
+            file_id, file_name, file_type = row
+            # Send the file to admin
+            if file_type == "photo":
+                await context.bot.send_photo(user_id, file_id, caption=file_name)
+            elif file_type == "video":
+                await context.bot.send_video(user_id, file_id, caption=file_name)
+            else:  # document, PDF, HTML, others
+                await context.bot.send_document(user_id, file_id, caption=file_name)
+        else:
+            await query.edit_message_text("❌ File not found or deleted.")
+
+    # Delete a user's file
+    elif data.startswith("adm_del_"):
+        fid = data.split("_")[2]
+        cur.execute("UPDATE files SET is_deleted=1 WHERE file_id=?", (fid,))
+        conn.commit()
+        await query.edit_message_text("🗑 File deleted successfully by admin.")
+
+
+                    
+
