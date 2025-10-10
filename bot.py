@@ -139,7 +139,7 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(auto_delete_file(file_id_db))
 
 # ===== ASYNC MAIN FUNCTION =====
-async import asyncio
+import asyncio 
 
 async def main_async():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -173,4 +173,5 @@ if __name__ == "__main__":
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main_async())
+
 
