@@ -181,6 +181,8 @@ async def main_async():
 
     await application.run_polling()
 
+import asyncio
+
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main_async())
+    loop = asyncio.get_event_loop()  # Get or create the event loop
+    loop.run_until_complete(main_async())  # Run the async main function until complete
