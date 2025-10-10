@@ -100,15 +100,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
     user_id = query.from_user.id
-
-    # Placeholder for all callback handling (admin and user file buttons)
+    # Placeholder for all callback handling
     await query.edit_message_text(f"Button clicked: {data}")
 
 # ===== MESSAGE HANDLERS =====
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     text = update.message.text.strip()
-    # Placeholder: login/register and admin search
     await update.message.reply_text(f"Received text: {text}")
 
 async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -132,7 +130,6 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     file_id_db = file_obj.file_id
     file_name = getattr(file_obj, 'file_name', 'unknown')
     tag = getattr(file_obj, 'mime_type', 'general')
-
     cur.execute("INSERT OR REPLACE INTO files (file_id, user_id, file_name, file_type, tag) VALUES (?, ?, ?, ?, ?)",
                 (file_id_db, user_id, file_name, file_type, tag))
     conn.commit()
@@ -153,7 +150,10 @@ def main():
 
     # Messages
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
-    application.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VIDEO, handle_file))
+    application.add_handler(MessageHandler(
+        filters.Document.ALL | filters.PHOTO | filters.VIDEO,
+        handle_file
+    ))
 
     # Callback buttons
     application.add_handler(CallbackQueryHandler(button_callback))
