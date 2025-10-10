@@ -138,28 +138,26 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await log_action(user_id, f"Uploaded file: {file_name}")
     asyncio.create_task(auto_delete_file(file_id_db))
 
-# ===== MAIN FUNCTION =====
-def main():
+# ===== ASYNC MAIN FUNCTION =====
+async def main_async():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Commands
+    # Delete any existing webhook to prevent conflict with polling
+    await application.bot.delete_webhook()
+
+    # Adding handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("logout", logout))
     application.add_handler(CommandHandler("admin", admin_panel))
     application.add_handler(CommandHandler("myfiles", myfiles))
 
-    # Messages
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
-    application.add_handler(MessageHandler(
-        filters.Document.ALL | filters.PHOTO | filters.VIDEO,
-        handle_file
-    ))
+    application.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VIDEO, handle_file))
 
-    # Callback buttons
     application.add_handler(CallbackQueryHandler(button_callback))
 
-    # Run bot
-    application.run_polling()
+    # Start the bot with polling
+    await application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main_async())
