@@ -3,20 +3,17 @@ import sqlite3
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
-from dotenv import load_dotenv
-import os
-
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-
-if not BOT_TOKEN:
-    raise ValueError("BOT_TOKEN is missing! Please set it in environment variables")
 
 # ===== CONFIG =====
-ADMIN_IDS = [7642147352]  # Replace with your Telegram ID(s)
+ADMIN_IDS = [6065778458]  # Replace with your Telegram ID(s)
 DATABASE = "mega_cloud.db"
-BOT_TOKEN = os.environ.get("7642147352:AAFhI8O8vpvSOovonO_A5UhTlTB4gpwFij4")  # Set in environment or .env
 MAX_LOGIN_ATTEMPTS = 3
 AUTO_DELETE_MINUTES = 30
+
+# ===== BOT TOKEN from Render Environment Variable =====
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN is missing! Please set it in Render Environment Variables")
 
 # ===== DATABASE SETUP =====
 conn = sqlite3.connect(DATABASE, check_same_thread=False)
@@ -97,6 +94,53 @@ async def myfiles(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("You have no uploaded files.")
 
+# ===== CALLBACK HANDLER =====
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    user_id = query.from_user.id
+
+    # Placeholder for all callback handling (admin and user file buttons)
+    await query.edit_message_text(f"Button clicked: {data}")
+
+# ===== MESSAGE HANDLERS =====
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    text = update.message.text.strip()
+    # Placeholder: login/register and admin search
+    await update.message.reply_text(f"Received text: {text}")
+
+async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    file_obj = None
+    file_type = None
+
+    if update.message.document:
+        file_obj = update.message.document
+        file_type = "document"
+    elif update.message.photo:
+        file_obj = update.message.photo[-1]
+        file_type = "photo"
+    elif update.message.video:
+        file_obj = update.message.video
+        file_type = "video"
+    else:
+        await update.message.reply_text("❌ Unsupported file type.")
+        return
+
+    file_id_db = file_obj.file_id
+    file_name = getattr(file_obj, 'file_name', 'unknown')
+    tag = getattr(file_obj, 'mime_type', 'general')
+
+    cur.execute("INSERT OR REPLACE INTO files (file_id, user_id, file_name, file_type, tag) VALUES (?, ?, ?, ?, ?)",
+                (file_id_db, user_id, file_name, file_type, tag))
+    conn.commit()
+
+    await update.message.reply_text(f"✅ File uploaded successfully! Auto-delete in {AUTO_DELETE_MINUTES} minutes.")
+    await log_action(user_id, f"Uploaded file: {file_name}")
+    asyncio.create_task(auto_delete_file(file_id_db))
+
 # ===== MAIN FUNCTION =====
 def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -119,7 +163,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
