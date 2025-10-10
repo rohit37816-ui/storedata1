@@ -3,7 +3,14 @@ import sqlite3
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
+from dotenv import load_dotenv
+import os
 
+load_dotenv()  # loads .env file
+BOT_TOKEN = os.environ.get("7642147352:AAFhI8O8vpvSOovonO_A5UhTlTB4gpwFij4")
+
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN is missing! Please set it in .env or environment variables")
 # ===== CONFIG =====
 ADMIN_IDS = [7642147352]  # Replace with your Telegram ID(s)
 DATABASE = "mega_cloud.db"
@@ -112,4 +119,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
