@@ -139,12 +139,23 @@ async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
     asyncio.create_task(auto_delete_file(file_id_db))
 
 # ===== ASYNC MAIN FUNCTION =====
+async import asyncio
+
 async def main_async():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Delete any existing webhook to prevent conflict with polling
+    # delete webhook to avoid conflicts
     await application.bot.delete_webhook()
 
+    # add handlers ...
+    application.add_handler(CommandHandler("start", start))
+    # add other handlers
+
+    await application.run_polling()
+
+if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main_async())
     # Adding handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("logout", logout))
@@ -162,3 +173,4 @@ async def main_async():
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main_async())
+
