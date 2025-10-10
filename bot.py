@@ -2,22 +2,20 @@ import os
 import asyncio
 import sqlite3
 from datetime import datetime, timedelta
-from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
-)
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler,
     filters, ContextTypes
 )
-import nest_asyncio  # For compatibility with certain async environments
+import nest_asyncio  # For Render async compatibility
 
-# CONFIGURATION
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-ADMIN_IDS = {6065778458}  # Replace with real admin Telegram IDs
+# Configuration
+BOT_TOKEN = "7642147352:AAFhI8O8vpvSOovonO_A5UhTlTB4gpwFij4"
+ADMIN_IDS = {6065778458}
 DB_PATH = "filebot.db"
 AUTO_DELETE_MINUTES = 30
 
-# DATABASE SETUP
+# Database setup
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -52,7 +50,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# UTILITY FUNCTIONS
 def log_action(user_id, action, details=""):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -72,14 +69,12 @@ async def auto_delete_file(file_db_id, delay_sec):
     c = conn.cursor()
     c.execute("UPDATE files SET deleted = 1 WHERE id = ?", (file_db_id,))
     conn.commit()
-    # Optionally log auto-deletion
     c.execute("SELECT owner_id FROM files WHERE id = ?", (file_db_id,))
     row = c.fetchone()
     if row:
         log_action(row[0], "auto-delete", f"File {file_db_id} auto-deleted")
     conn.close()
 
-# COMMAND HANDLERS
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("Login", callback_data="login"),
@@ -98,14 +93,110 @@ async def logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
         c.execute("UPDATE files SET deleted=1 WHERE owner_id=?", (owner_id,))
         log_action(owner_id, "logout", "User logged out and files deleted")
         await update.message.reply_text("You have been logged out. All your files are deleted.")
-sqlite3
-import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, CallbackQueryHandler, filters
+    else:
+        await update.message.reply_text("You are not logged in.")
+    conn.commit()
+    conn.close()
 
-# ===== CONFIG =====
-ADMIN_IDS = [6065778458]  # Replace with your Telegram ID(s)
-DATABASE = "mega_cloud.db"
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not check_admin(user_id):
+        await update.message.reply_text("Access denied.")
+        return
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("View All Files", callback_data="admin_all_files")],
+        [InlineKeyboardButton("Search User Files", callback_data="admin_search_user")],
+        [InlineKeyboardButton("View User Credentials", callback_data="admin_user_creds")],
+        [InlineKeyboardButton("Global Auto-Clean", callback_data="admin_clean")],
+        [InlineKeyboardButton("View Logs", callback_data="admin_logs")]
+    ])
+    await update.message.reply_text("Admin Panel:", reply_markup=kb)
+
+async def myfiles(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE telegram_id = ?", (user_id,))
+    row = c.fetchone()
+    if not row:
+        await update.message.reply_text("Please login to see your files.")
+        conn.close()
+        return
+    owner_id = row[0]
+    c.execute("SELECT id, file_type, file_name, uploaded_at FROM files WHERE owner_id = ? AND deleted = 0", (owner_id,))
+    files = c.fetchall()
+    if not files:
+        await update.message.reply_text("No active files.")
+        conn.close()
+        return
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton(f"{f[1]}: {f[2]} ({f[3]})", callback_data=f"file_{f[0]}")]
+        for f in files
+    ])
+    await update.message.reply_text("Your active files:", reply_markup=kb)
+    conn.close()
+
+async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    await query.edit_message_text(f"You clicked: {data}")
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(update.message.text)
+
+async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE telegram_id = ?", (user_id,))
+    row = c.fetchone()
+    if not row:
+        await update.message.reply_text("Please login before uploading files.")
+        conn.close()
+        return
+    owner_id = row[0]
+    file_obj = update.message.document or (update.message.photo[-1] if update.message.photo else None) or update.message.video
+    if not file_obj:
+        await update.message.reply_text("Unsupported file type.")
+        conn.close()
+        return
+    file_id = file_obj.file_id
+    file_type = (
+        "document" if update.message.document
+        else "photo" if update.message.photo
+        else "video"
+    )
+    file_name = getattr(file_obj, "file_name", "unnamed")
+    now = datetime.utcnow()
+    delete_at = now + timedelta(minutes=AUTO_DELETE_MINUTES)
+    c.execute(
+        "INSERT INTO files (owner_id, file_id, file_type, file_name, uploaded_at, delete_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (owner_id, file_id, file_type, file_name, now.isoformat(), delete_at.isoformat())
+    )
+    file_db_id = c.lastrowid
+    log_action(owner_id, "upload", f"Uploaded {file_type}: {file_name}")
+    conn.commit()
+    conn.close()
+    await update.message.reply_text(f"File {file_name} uploaded and scheduled for auto-deletion.")
+    asyncio.create_task(auto_delete_file(file_db_id, AUTO_DELETE_MINUTES * 60))
+
+async def main_async():
+    nest_asyncio.apply()
+    init_db()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("logout", logout))
+    app.add_handler(CommandHandler("admin", admin_panel))
+    app.add_handler(CommandHandler("myfiles", myfiles))
+    app.add_handler(CallbackQueryHandler(button_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VIDEO, handle_file))
+    await app.run_polling()
+
+if __name__ == "__main__":
+    asyncio.run(main_async())DATABASE = "mega_cloud.db"
 AUTO_DELETE_MINUTES = 30
 
 # ===== BOT TOKEN =====
@@ -203,3 +294,4 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(f"Button clicked: {data}")
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
