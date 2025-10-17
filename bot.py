@@ -8,7 +8,7 @@ from telegram.ext import (
     filters, ContextTypes
 )
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7642147352:AAFhI8O8vpvSOovonO_A5UhTlTB4gpwFij4")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7642147352:AAEkBrE-ePGOE0l-_GBWNgoRYBDF-Zai664")
 ADMIN_IDS = {6065778458}
 DB_PATH = "filebot.db"
 AUTO_DELETE_MINUTES = 30
@@ -217,3 +217,4 @@ if __name__ == "__main__":
     # Use event loop compatible with environments like Render
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main_async())
+
