@@ -8,7 +8,7 @@ from telegram.ext import (
     filters, ContextTypes
 )
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7642147352:AAEkBrE-ePGOE0l-_GBWNgoRYBDF-Zai664")
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 ADMIN_IDS = {6065778458}
 DB_PATH = "filebot.db"
 AUTO_DELETE_MINUTES = 30
@@ -79,32 +79,26 @@ async def auto_delete_file(file_db_id, delay_sec):
     except Exception as e:
         print("Auto-delete error:", e)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("Login", callback_data="login"),
-         InlineKeyboardButton("Register", callback_data="register")]
-    ])
-    await update.message.reply_text("Welcome! Please login or register:", reply_markup=kb)
+# --- Handlers same as before --- (start, logout, admin_panel, myfiles, button_callback, handle_text, handle_file, error_handler)
 
-async def logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT id FROM users WHERE telegram_id = ?", (user_id,))
-        row = c.fetchone()
-        if row:
-            owner_id = row[0]
-            c.execute("UPDATE files SET deleted=1 WHERE owner_id=?", (owner_id,))
-            log_action(owner_id, "logout", "User logged out and files deleted")
-            await update.message.reply_text("You have been logged out. All your files are deleted.")
-        else:
-            await update.message.reply_text("You are not logged in.")
-        conn.commit()
-    except Exception as e:
-        print("Logout error:", e)
-    finally:
-        conn.close()
+async def main_async():
+    init_db()
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    await app.bot.delete_webhook(drop_pending_updates=True)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("logout", logout))
+    app.add_handler(CommandHandler("admin", admin_panel))
+    app.add_handler(CommandHandler("myfiles", myfiles))
+    app.add_handler(CallbackQueryHandler(button_callback))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(MessageHandler(filters.Document.ALL | filters.PHOTO | filters.VIDEO, handle_file))
+    app.add_error_handler(error_handler)
+    await app.run_polling()
+
+if __name__ == "__main__":
+    import nest_asyncio
+    nest_asyncio.apply()
+    asyncio.run(main_async())        conn.close()
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -217,4 +211,5 @@ if __name__ == "__main__":
     # Use event loop compatible with environments like Render
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main_async())
+
 
